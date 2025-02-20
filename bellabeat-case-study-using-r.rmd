@@ -1,6 +1,7 @@
 ---
 output:
-  html_document: 
+  github_document: 
+    html_preview: false
 ---
 
 ```{r setup, include=FALSE}
