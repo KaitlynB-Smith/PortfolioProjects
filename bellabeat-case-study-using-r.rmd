@@ -1,7 +1,5 @@
 ---
-output:
-  github_document: 
-    html_preview: false
+output: rmarkdown::github_document
 ---
 
 ```{r setup, include=FALSE}
