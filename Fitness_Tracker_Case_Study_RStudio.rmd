@@ -1,0 +1,394 @@
+# %% [code]
+---
+output: rmarkdown::github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# About Bellabeat
+Bellabeat is a small, successful company that manufactures health-focused mart-products for women. The company was founded by founded by Urška Sršen and Sando Mur in 2013 with the goal of creating beautifully designed technology that informs and inspires women. Products include a Bellabeat app, wellness trackers, samrt-technology water bottle, and a subscription-based membership. Bellabeat products collect data on sleep, activity, stress, and reproductive health to provide women with knowledge and insights about their health and habits. To reveal opportunities for company growth, Sršen wants to use available data to analyze trends and insights about how people use their smart devices. The recommendations will help improve the marketing strategy for Bellabeat smart-products. 
+
+# Goals of the Analysis:
+    
+1.	Identify trends in smart device usage.
+2.	Explain how these trends apply to Bellabeat customers. 
+3.	Describe how these trends could help influence Bellabeat marketing strategy.
+
+# The Data
+This analysis uses [FitBit Fitness Tracker Data](https://www.kaggle.com/datasets/arashnic/fitbit), originally published by Amazon Mechanical Turk 03/12/2016 - 05/12/2016. The owner of this data has dedicated the data to be Public Domain. This data includes 33 users who have allowed their personal fitness tracking data to be collected.
+
+# Loading Packages
+
+```{r loading packages, echo=TRUE}
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(scales)
+```
+
+# Importing Data
+Data used for this analysis includes the following data files between the dates of 4/12/16 - 5/12/2016. \ 
+Note: when importing the data, the column types for the dates were changed from character format to date/datetime format.
+
+```{r}
+daily_activity <- read_csv("../input/fitbit/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv", 
+    col_types = cols(ActivityDate = col_date(format = "%m/%d/%Y")))
+
+hourly_calories <- read_csv("../input/fitbit/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/hourlyCalories_merged.csv", 
+    col_types = cols(ActivityHour = col_datetime(format = "%m/%d/%Y %H:%M:%S %p")))
+
+hourly_steps <- read_csv("../input/fitbit/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/hourlySteps_merged.csv", 
+    col_types = cols(ActivityHour = col_datetime(format = "%m/%d/%Y %H:%M:%S %p")))
+
+sleep_day <- read_csv("../input/fitbit/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv", 
+    col_types = cols(SleepDay = col_datetime(format = "%m/%d/%Y %H:%M:%S %p")))
+```
+# Cleaning Data
+## Searching Distinct Values
+There are 33 participants in each dataset except for the sleep_day dataset, which has 24 participants
+```{r searching for duplicates, echo=TRUE}
+n_distinct(daily_activity$Id)
+n_distinct(hourly_calories$Id)
+n_distinct(hourly_steps$Id)
+n_distinct(sleep_day$Id)
+```
+
+## Filtering for and Deleting Duplicates 
+3 duplicates were found and removed in the sleep_day dataset.
+
+```{r duplicates, results = 'hide'}
+daily_activity %>% 
+  distinct()
+hourly_calories %>% 
+  distinct()
+hourly_steps %>% 
+  distinct()
+sleep_day %>% 
+  distinct()
+sleep_day <- sleep_day %>% 
+  distinct()
+```
+
+## Renaming Columns
+Renamed the columns in each data set to be lowercase to help maintain consistency when working with the data:
+```{r renaming columns to lowercase, echo=TRUE}
+daily_activity <- rename_with(daily_activity, tolower)
+hourly_calories <- rename_with(hourly_calories, tolower)
+hourly_steps <- rename_with(hourly_steps, tolower)
+sleep_day <- rename_with(sleep_day, tolower)
+```
+
+Renamed similar columns to ensure column names are consistent across all data sets:
+```{r renaming columns, echo=TRUE}
+daily_activity <- daily_activity %>% 
+  rename(
+    "moderatelyactiveminutes" = "fairlyactiveminutes",
+    "date" = "activitydate")
+hourly_steps <- hourly_steps %>% 
+  rename(
+    "totalsteps" = "steptotal")
+sleep_day <- sleep_day %>% 
+  rename(
+    "date" = "sleepday")
+```
+
+Created new data frames with 'activityhour' column separated into 'time' and 'date' columns:
+```{r echo=TRUE, warning=FALSE}
+hourly_calories_separate <- separate(
+  hourly_calories, 
+  col = "activityhour", 
+  into = c("date", "time"), 
+  sep = " ") 
+hourly_calories_separate$time <- format(as.POSIXct(
+  hourly_calories$activityhour), format = "%H:%M")
+
+hourly_steps_separate <- separate(
+  hourly_steps, 
+  col = "activityhour", 
+  into = c("date", "time"), 
+  sep = " ") 
+hourly_steps_separate$time <- format(as.POSIXct(
+  hourly_steps$activityhour), format = "%H:%M")
+```
+
+# Exploring Trends in the Data
+## Daily Activity Data Summary
+```{r echo=TRUE}
+daily_activity %>% 
+  select(
+    totalsteps,
+    veryactivedistance,
+    moderatelyactivedistance,
+    lightactivedistance,
+    veryactiveminutes,
+    moderatelyactiveminutes,
+    lightlyactiveminutes,
+    sedentaryminutes,
+    calories) %>% 
+  summary()
+```
+
+## Sleep Data Summary
+```{r echo=TRUE}
+sleep_day %>% 
+  group_by() %>% 
+  mutate(
+    "minutes_awake_in_bed" = totaltimeinbed - totalminutesasleep,
+    "hours_of_sleep" = totalminutesasleep / 60) %>% 
+  select(
+    totalminutesasleep,
+    totaltimeinbed,
+    minutes_awake_in_bed,
+    hours_of_sleep) %>% 
+  summary()
+
+```
+
+## Interesting Trends \
+\
+-  Users were sedentary for an average of 991 minutes per day \
+-  Users took an average of 7638 steps per day \
+-  Users spent an average of 39.3 minutes awake in bed \
+-  Users get an average of 7.0 hours of sleep per night \
+
+
+# Data Manipulation and Merging
+### New Dataframe: Average Caloric Expenditure per Hour
+```{r echo=TRUE}
+average_hourly_calories <- hourly_calories_separate %>% 
+  group_by(time) %>% 
+  summarize(
+    calories = mean(calories))
+```
+
+### New Dataframe: Average Number of Steps Taken per Hour
+```{r echo=TRUE}
+average_hourly_steps <- hourly_steps_separate %>% 
+  group_by(time) %>% 
+  summarize(
+    total_steps = mean(totalsteps))
+```
+
+### New Dataframe: Distribution of Active Minutes by Date
+```{r}
+daily_intensities_averages <- daily_activity %>%
+  group_by(date) %>% 
+  summarize(
+    "veryactiveminutes" = mean(veryactiveminutes),
+    "moderatelyactiveminutes" = mean(moderatelyactiveminutes),
+    "lightlyactiveminutes" = mean(lightlyactiveminutes), 
+    "sedentaryminutes" = mean(sedentaryminutes)) %>% 
+  pivot_longer(
+    cols = contains("minutes"), 
+    names_to = "intensity",
+    values_to = "minutes")
+```
+
+### Dataframe Manipulation: Comparison of Time in Bed Spent Sleeping vs. Awake 
+```{r}
+sleep_day <- sleep_day %>% 
+  mutate(
+    "totalminutesawakeinbed" = totaltimeinbed - totalminutesasleep)
+```
+
+### Data Merging: Daily Activity Data and Sleep Data
+```{r}
+daily_statistics <- merge(daily_activity, sleep_day, by = cbind("id", "date"))
+```
+
+### New Dataframe: Sleep Metrics per User 
+I created a new table using the sleep data to count the average amount of time in bed spent asleep and awake per user. I also created a new column to calculate the percentage of the amount of time spent asleep and awake in bed. 
+```{r}
+sleep_day_long <- sleep_day %>% 
+  group_by(date) %>% 
+  summarize(
+    "totalminutesasleep" = mean(totalminutesasleep),
+    "totalminutesawakeinbed" = mean(totalminutesawakeinbed),
+    "totaltimeinbed" = mean(totaltimeinbed)) %>% 
+  mutate(
+    "percent_sleeping" = totalminutesasleep / totaltimeinbed,
+    "percent_awake" = totalminutesawakeinbed / totaltimeinbed) %>% 
+  pivot_longer(
+    cols = c(totalminutesasleep, totalminutesawakeinbed),
+    names_to = "category",
+    values_to = "minutes") %>% 
+  mutate(
+    percent = case_when(
+      category == "totalminutesasleep" ~ percent_sleeping,
+      category == "totalminutesawakeinbed" ~ percent_awake)) %>% 
+  select(-percent_sleeping, -percent_awake)
+```
+
+# Analyzing and Plotting Data
+```{r echo=TRUE}
+ggplot(data = daily_activity, aes(x = totalsteps, y = calories)) +
+  geom_point() + 
+  geom_smooth() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Comparing Total Daily Steps to Number of Calories Burned",
+       x = "Daily Caloric Expenditure", 
+       y = "Total Daily Steps")
+```
+
+There appears to be a positive correlation between the total steps taken per day and the amount of calories burned per day. The data suggests that the more steps taken per day, the more calories users burn per day. This could influence the the development of Bellabeat technology and the target audience of specific marketing campaigns.
+
+
+
+```{r echo=TRUE}
+ggplot(data = average_hourly_calories, aes(x = time, y = calories)) +
+  geom_col(fill = "thistle4") +
+  scale_fill_identity() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Average Number of Calories Burned per Hour", 
+    x = "Time of Day", 
+    y = "Calorie Expenditure")
+```
+
+This graph illustrates the variation in caloric expenditure per hour. The hours of the day with the highest caloric expenditure appear to be between 5:00pm - 8:00pm. This data could help influence the product development team develop new technology for users to help them analyze their daily habits. 
+
+
+
+```{r echo=TRUE}
+ggplot(data = average_hourly_steps, aes(x = time, y = total_steps)) +
+  geom_col(fill = "thistle4") +
+  scale_fill_identity() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Average Number of Steps Taken per Hour",
+    x = "Time of Day",
+    y = "Number of Steps")
+```
+
+This graph indicates that users were most active from 12:00pm - 3:00pm and 4:00pm - 7:00pm. This information suggests that those who use fitness trackers are most active in these time spans and could indicate the types of work these individuals are engaged in. This data could be used by the marketing team to determine who to target in their marketing campaigns.
+
+
+```{r}
+daily_intensities_averages <- daily_intensities_averages %>% 
+  mutate(intensity = factor(
+    intensity, 
+    levels = c("veryactiveminutes", 
+               "moderatelyactiveminutes",
+               "lightlyactiveminutes",
+               "sedentaryminutes")))
+ggplot(data = daily_intensities_averages, aes(x = date, y = minutes, fill = intensity)) +
+  geom_col() +
+  scale_fill_manual(
+    values = c(
+      "veryactiveminutes" = "darkolivegreen4", 
+      "moderatelyactiveminutes" = "darkgoldenrod2",
+      "lightlyactiveminutes" = "cadetblue3",
+      "sedentaryminutes" = "darksalmon"),
+    labels = c(
+      "veryactiveminutes" = "Very Active",
+      "moderatelyactiveminutes" = "Moderately Active",
+      "lightlyactiveminutes" = "Lightly Active",
+      "sedentaryminutes" = "Sedentary")) +
+  labs(
+    title = "Average Distribution of Activity Intensities per Day",
+    y = "Time in Minutes", 
+    x = "Date", 
+    fill = "Activity Intensity") +
+  theme(
+    plot.title = element_text(hjust = 0.5)) 
+```
+
+This graph indicates that users primarily engage in sedentary activity intensity. This data could help to inform the development team on new technology that promotes engaging in non-sedentary activity more frequently throughout the day. This can also further identify the types of individuals who Bellabeat may consider targeting their marketing campaigns towards.
+
+ 
+```{r echo=TRUE}
+ggplot(data = sleep_day) +
+  geom_point(mapping = aes(x = totaltimeinbed, y = totalminutesasleep)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Comparing Total Time Asleep to Total Time in Bed",
+       y = "Total Minutes Asleep", 
+       x = "Total Time in Bed")
+```
+
+This graph illustrates the relationship between the amount of time spent asleep and the amount of time spent in bed are positively correlated. This data could be helpful in creating sleep-focused technologies for users who may have specific sleep goals. 
+
+
+```{r echo=TRUE}
+ggplot(data = daily_statistics, aes(x = totalminutesasleep, y = sedentaryminutes)) +
+  geom_point() +
+  geom_smooth() + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  labs(
+    title = "Comparing Sedentary Minutes with Total Minutes Asleep", 
+    x = "Total Minutes of Sleep per Day",
+    y = "Total Sedentary Minutes per Day")
+```
+
+This graph indicates that there is a correlation between the amount of sleep and the amount of time spent sedentary per day. On average, users who spend less time engaging in sedentary activity obtain a greater amount of sleep per night. 
+
+
+```{r echo=TRUE}
+sleep_day_long <- sleep_day_long %>% 
+  mutate(category = factor(category, levels = c("totalminutesawakeinbed", "totalminutesasleep")))
+
+ggplot(data = sleep_day_long, aes(x = date, y = minutes, fill = category)) +
+  geom_col() +
+  geom_text(
+    aes(label = scales::percent(percent, accuracy = 1)),
+    position = position_stack(vjust = 0.5), size = 2.0) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_manual(
+    values = c("totalminutesawakeinbed" = "azure3", "totalminutesasleep" = "darksalmon"),
+    labels = c("totalminutesawakeinbed" = "Minutes Awake", "totalminutesasleep" = "Minutes Asleep")) +
+  labs(
+    title = "Average Time Asleep in Bed vs. Average Time Awake in Bed",
+    y = "Time in Minutes", 
+    x = "Date", 
+    fill = "Time in Bed") +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(hjust = 0.5), 
+    plot.background = element_rect(fill = "white", color = NA)) 
+```
+
+This graph illustrates the difference between the amount of time spent awake and the amount of time spent sleeping while in bed. On average, users spent 39.3 minutes awake in bed per night.This is approximately 8.6% of the total time spent in bed. Smart-product users who have sleep-specific goals could benefit from the implementation of sleep-focused technologies to assist them in decreasing the amount of time spent awake in bed. 
+
+
+# Summary and Recommendations
+## Activity-Focused Marketing Strategies
+The trends identified in this analysis indicate that smart-device users were most active during the afternoons, traveling an average of 7,638 steps per day. Additionally, users spent an average of 991 minutes, or 16.5 hours, per day engaged in sedentary activity. Bellabeat could consider creating marketing campaigns toward individuals who work in sedentary jobs to monitor their daily health metrics and adjust their current activity habits.
+
+According to a study released by the [European Journal of Preventative Cardiology](https://doi.org/10.1093/eurjpc/zwad229) in 2023, there is an inverse association between daily step count and all-cause mortality. Bellabeat may consider marketing their technology to individuals who want to integrate healthful habits into their lifestyles to decrease risks of developing chronic diseases.
+
+Offering goal-oriented technology could be useful for individuals who may benefit from daily reminders to engage healthful activities during the day. 
+Bellabeat may consider targeting marketing strategies toward individuals who have health-focused activity goals that could include:  \
+\
+ -  Target daily step-counts to promote cardiovascular health  
+ -  Target calorie expenditures for weight loss, weight gain, or weight maintenance  
+ -  Target activity intensities to decrease the amount of time spent sedentary per day  
+ -  Reducing the amount of time spent sedentary to encourage healthy sleep patterns  
+
+## Sleep-Focused Marketing Strategies
+This analysis indicated that smart-device users slept for an average of 7.0 hours per night and spent an average of 39.3 minutes awake in bed per night. According to the [National Heart, Lung, and Blood Institute](https://www.nhlbi.nih.gov/health/sleep/how-much-sleep), adults are recommended to get between 7 and 9 hours of sleep per night. Bellabeat could consider marketing their products toward individuals who want to gain insights on their nightly sleep patterns, monitor the amount of sleep they get per night, decrease the amount of time spent awake in bed, or set sleep-specific goals. This could be especially useful for individuals who struggle with disordered sleep patterns and could assist them in monitoring their sleep metrics.
+
+
+## Technology Development
+The trends identified in the data analysis may indicate that Bellabeat customers could benefit from additional smart-product technologies that could further assist customers in tracking their daily health metrics and habits. 
+Technologies Bellabeat may consider implementing include: \
+\
+ -  App or smart-device notifications if the target hourly steps or activity intensities has not been reached \
+ -  App or smart-device notifications to remind users to engage in a relaxing activity before bed to encourage restful sleep \
+ -  App or smart-device notification to remind users to get ready for bed based on their target bed-time \
+ -  App or smart-device interactive visualizations that monitor sleep patterns and sleep quality throughout the night \
+
+
+# Citations
+European Journal of Preventive Cardiology, Volume 30, Issue 18, December 2023, Pages 1975–1985, https://doi.org/10.1093/eurjpc/zwad229
+Published: 09 August 2023
+
+“How Sleep Works - How Much Sleep Is Enough?” National Heart, Lung, and Blood Institute, 24 March 2022, https://www.nhlbi.nih.gov/health/sleep/how-much-sleep. Accessed 12 November 2024.
